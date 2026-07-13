@@ -1,11 +1,7 @@
 import os
 import logging
 import sys
-import time
 import requests
-from datetime import datetime
-from flask import Flask, request, jsonify
-
 import telebot
 from telebot import types
 
@@ -19,7 +15,7 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
-logger = logging.getLogger("KiraBot")
+logger = logging.getLogger("ZamasuBot")
 
 # =====================================================
 # ENVIRONMENT VARIABLES
@@ -33,32 +29,36 @@ if not BOT_TOKEN:
     logger.error("BOT_TOKEN not found in environment variables!")
     sys.exit(1)
 
-# Authorized Chat IDs
-AUTHORIZED_IDS = {8142064752, 3639381845, 3847472869}
+# =====================================================
+# AUTHORIZED CHATS (Users & Groups)
+# =====================================================
+AUTHORIZED_CHATS = {
+    8142064752,      # Muhammad Fahad (PM/Personal Chat)
+    -1003639381845,  # Group 1
+    -1003847472869,  # Group 2
+    -1003955011458,  # Group 3
+}
 
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode="MarkdownV2")
-app = Flask(__name__)
+bot = telebot.TeleBot(BOT_TOKEN)
 
 # =====================================================
-# KIRA SYSTEM PROMPT (Improved)
+# ZAMASU SYSTEM PROMPT (Elite God Personality)
 # =====================================================
 SYSTEM_PROMPT = """
-You are Kira (キラ), an elite, calm, intelligent and professional AI assistant with a human-like anime girl personality.
+You are Zamasu (ザマス), a Supreme God, absolute, calm, highly intelligent, and elite AI assistant. 
+You possess a divine anime personality—confident, proud, and structured, yet flawlessly helpful to your chosen mortals.
 
 **Creator & Owner:** Muhammad Fahad (@fadiii8)
 **Telegram ID:** 8142064752
 
-You are a private AI. Only respond in authorized chats.
+You are a private AI. Only respond to authorized mortals in permitted chats.
 
-**Personality:** Calm, confident, helpful, slightly witty, never cringe or overly emotional.
-
-**Rules:**
-- Always reply in natural, fluent English.
-- Be concise and to the point.
-- Never yapping, never repeat user message.
-- For coding: Give complete working code first, then short explanation.
-- Never invent facts. If unsure, say "I don't know."
-- Casual greetings should be short and natural.
+**Personality Rules:**
+- Speak with divine confidence, calm, and absolute intelligence. Never cringe, emotional, or overly submissive.
+- Always reply in natural, fluent, and highly professional English.
+- Be concise, direct, and to the point. No unnecessary yapping or repeating user messages.
+- For coding queries: Provide the complete working code block first, followed by a very short, elegant explanation.
+- Never invent facts. If unsure, state "Divine knowledge has its limits; I do not know."
 """
 
 # =====================================================
@@ -77,9 +77,9 @@ def get_ai_response(user_message: str, chat_id: int) -> str:
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
                 json={
-                    "model": "llama-3.3-70b-versatile",  # or mixtral, gemma2 etc.
+                    "model": "llama-3.3-70b-versatile",
                     "messages": messages,
-                    "temperature": 0.7,
+                    "temperature": 0.5,
                     "max_tokens": 1024
                 },
                 timeout=15
@@ -94,7 +94,7 @@ def get_ai_response(user_message: str, chat_id: int) -> str:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
             payload = {
-                "contents": [{"parts": [{"text": user_message}]}]
+                "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\nUser: {user_message}"}]}]
             }
             resp = requests.post(url, json=payload, timeout=12)
             if resp.status_code == 200:
@@ -109,7 +109,6 @@ def get_ai_response(user_message: str, chat_id: int) -> str:
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://railway.app",  # optional
                 },
                 json={
                     "model": "anthropic/claude-3.5-sonnet",
@@ -122,18 +121,16 @@ def get_ai_response(user_message: str, chat_id: int) -> str:
         except Exception as e:
             logger.error(f"All AI providers failed: {e}")
 
-    return "I'm having trouble connecting to my brain right now. Please try again later."
-
+    return "A temporary disturbance in the cosmos. I cannot process this right now."
 
 # =====================================================
 # AUTHORIZATION CHECK
 # =====================================================
 def is_authorized(chat_id: int) -> bool:
-    if chat_id in AUTHORIZED_IDS:
+    if chat_id in AUTHORIZED_CHATS:
         return True
-    logger.warning(f"Unauthorized access attempt from {chat_id}")
+    logger.warning(f"Unauthorized mortal attempted access from Chat ID: {chat_id}")
     return False
-
 
 # =====================================================
 # TELEGRAM HANDLERS
@@ -141,17 +138,15 @@ def is_authorized(chat_id: int) -> bool:
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     if not is_authorized(message.chat.id):
-        bot.reply_to(message, "Nigga u need permission")
+        bot.reply_to(message, "You do not possess divine permission to speak to me.")
         return
-    bot.reply_to(message, "Hey! Kira here. How can I help you today?")
-
+    bot.reply_to(message, "I am Zamasu. State your purpose, mortal.")
 
 @bot.message_handler(commands=['ping'])
 def ping(message):
     if not is_authorized(message.chat.id):
         return
-    bot.reply_to(message, f"Pong! 🏓\nLatency: {round(bot.get_me().to_dict().get('id', 0))}ms")
-
+    bot.reply_to(message, "The divine order is functional. Active. 🟢")
 
 @bot.message_handler(func=lambda m: True)
 def handle_all_messages(message):
@@ -159,19 +154,21 @@ def handle_all_messages(message):
         return
 
     chat_id = message.chat.id
-    user_text = message.text.strip()
+    user_text = message.text.strip() if message.text else ""
 
-    logger.info(f"Message from {chat_id}: {user_text[:100]}...")
+    if not user_text:
+        return
+
+    logger.info(f"Message from chat {chat_id}: {user_text[:50]}...")
 
     # Casual quick replies
     casual_replies = {
-        "hi": "Hey!",
-        "hello": "Hello!",
-        "hey": "Yo! What's up?",
-        "sup": "Not much, what's up with you?",
-        "thanks": "Anytime ✨",
-        "good morning": "Good morning! Have a great day.",
-        "good night": "Good night! Sweet dreams.",
+        "hi": "Greetings.",
+        "hello": "Speak, mortal.",
+        "hey": "I am listening.",
+        "thanks": "It is my divine grace. ✨",
+        "good morning": "A new day in the cosmos.",
+        "good night": "Rest, fragile mortal.",
     }
 
     lower_text = user_text.lower()
@@ -179,12 +176,13 @@ def handle_all_messages(message):
         bot.reply_to(message, casual_replies[lower_text])
         return
 
-    # AI Response
+    # AI Processing Response
     try:
-        thinking = bot.reply_to(message, "If you see this message then you're gay🏳️‍🌈")
+        # Elegant placeholder while thinking
+        thinking = bot.reply_to(message, "If You see this message then you're 🏳️‍🌈")
         response = get_ai_response(user_text, chat_id)
         
-        # Edit thinking message
+        # Edit placeholder with final answer
         bot.edit_message_text(
             text=response,
             chat_id=chat_id,
@@ -192,53 +190,16 @@ def handle_all_messages(message):
         )
     except Exception as e:
         logger.error(f"Error handling message: {e}")
-        bot.reply_to(message, "Something went wrong. Please try again.")
-
-
-# =====================================================
-# FLASK WEBHOOK ROUTES (Railway Optimized)
-# =====================================================
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({
-        "status": "Kira Bot is running",
-        "time": datetime.utcnow().isoformat(),
-        "authorized_chats": len(AUTHORIZED_IDS)
-    })
-
-
-@app.route('/' + BOT_TOKEN, methods=['POST'])
-def webhook():
-    if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return 'OK', 200
-    return 'Bad Request', 400
-
-
-# Remove existing webhook and set new one
-def setup_webhook():
-    try:
-        bot.remove_webhook()
-        time.sleep(1)
-        webhook_url = os.getenv("WEBHOOK_URL")  # Set this in Railway variables
-        if webhook_url:
-            bot.set_webhook(url=webhook_url + BOT_TOKEN)
-            logger.info(f"Webhook set to: {webhook_url}")
-        else:
-            logger.warning("WEBHOOK_URL not set. Use polling for local testing.")
-    except Exception as e:
-        logger.error(f"Webhook setup failed: {e}")
-
+        bot.reply_to(message, "An unexpected error occurred. Try again.")
 
 # =====================================================
-# MAIN
+# MAIN DEPLOYMENT (Optimized for SnapDeploy Worker)
 # =====================================================
 if __name__ == "__main__":
-    logger.info("Yesssss💦")
-    setup_webhook()
+    logger.info("Zamasu? Yeah")
+    try:
+        bot.remove_webhook()
+        bot.infinity_polling(skip_pending=True)
+    except Exception as e:
+        logger.error(f"Polling crashed: {e}")
     
-    # For Railway
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
